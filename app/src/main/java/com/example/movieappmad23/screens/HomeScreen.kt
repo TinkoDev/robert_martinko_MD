@@ -11,19 +11,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.movieappmad23.models.Movie
-import com.example.movieappmad23.models.getMovies
-import com.example.movieappmad23.viewmodels.ViewMovieModel
+import com.example.movieappmad23.modelviews.ViewMovieModel
 import com.example.movieappmad23.widgets.HomeTopAppBar
 import com.example.movieappmad23.widgets.MovieRow
+import kotlinx.coroutines.launch
 
 @Composable
-@Preview
 fun HomeScreen(navController: NavController = rememberNavController(), viewMovieModel: ViewMovieModel){
     Scaffold(topBar = {
         HomeTopAppBar(
@@ -58,11 +60,11 @@ fun MainContent(
     navController: NavController,
     movieModel: ViewMovieModel
 ) {
+    val moviesState by movieModel.movieList.collectAsState()
     //val movies = getMovies()
     MovieList(
-        modifier = modifier,
         navController = navController,
-        //movies = movies,
+        movies = moviesState,
         movieModel = movieModel
 
     )
@@ -71,23 +73,19 @@ fun MainContent(
 
 @Composable
 fun MovieList(
-    modifier: Modifier = Modifier,
     navController: NavController,
     movieModel: ViewMovieModel,
-    //movies: List<Movie> = getMovies()
+    movies: List<Movie>
 ) {
-    LazyColumn (
-        modifier = modifier,
-        contentPadding = PaddingValues(all = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        items(movieModel.movies) { movie ->
+    val coroutineScope = rememberCoroutineScope()
+    LazyColumn {
+        items(movies) { movie ->
             MovieRow(
                 movie = movie,
-                onItemClick = { movieId ->
-                    navController.navigate(Screen.DetailScreen.withId(movieId))
-                },
-                onFavoriteClick = {movieModel.markFavorite(movie)}
+                onItemClick = { navController.navigate("detailscreen/${movie.id}") },
+                onFavoriteClick = {  coroutineScope.launch {
+                    movieModel.toggleFavorite(movie)
+                }}
             )
         }
     }

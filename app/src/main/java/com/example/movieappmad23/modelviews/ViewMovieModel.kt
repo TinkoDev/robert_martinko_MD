@@ -1,156 +1,230 @@
-package com.example.movieappmad23.viewmodels
+package com.example.movieappmad23.modelviews
 
-import androidx.compose.runtime.toMutableStateList
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavController
 import com.example.movieappmad23.models.Genre
 import com.example.movieappmad23.models.ListItemSelectable
+import com.example.movieappmad23.repo.MovieRepository
 import com.example.movieappmad23.models.Movie
-import com.example.movieappmad23.models.getMovies
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import java.util.*
 
-class ViewMovieModel : ViewModel() {
-    private val _movieList = getMovies().toMutableStateList()
-    val movies: List<Movie>
+class ViewMovieModel(private val repository: MovieRepository) : ViewModel() {
+    private val _movieList = MutableStateFlow(listOf<Movie>());
+
+    val movieList: MutableStateFlow<List<Movie>>
         get() = _movieList
 
-    private val _favorites = getMovies().filter { x -> x.isFavorite }.toMutableStateList()
-    val favorites: List<Movie>
-        get() = _favorites
 
-    private var _titleError = MutableLiveData<Boolean>(true)
-    var titleError: LiveData<Boolean>
-        get() = _titleError
-        set(value) { _titleError.value = value.value }
+    private var movie: Movie = Movie()
 
-    private val _titleErrorMessage = MutableLiveData<String>()
-    val titleErrorMessage: LiveData<String>
-        get() = _titleErrorMessage
+    var title: MutableState<String> = mutableStateOf(movie.title)
+    var isTitleValid: MutableState<Boolean> = mutableStateOf(false)
+    var titleErrMsg: MutableState<String> = mutableStateOf("")
 
-    private var _yearError = MutableLiveData<Boolean>(true)
-    var yearError: LiveData<Boolean>
-        get() = _yearError
-        set(value) { _yearError.value = value.value }
-
-    private val _yearErrorMessage = MutableLiveData<String>()
-    val yearErrorMessage: LiveData<String>
-        get() = _yearErrorMessage
-
-    private var _genreError = MutableLiveData<Boolean>(true)
-    var genreError: LiveData<Boolean>
-        get() = _genreError
-        set(value) { _genreError.value = value.value }
-
-    private val _genreErrorMessage = MutableLiveData<String>()
-    val genreErrorMessage: LiveData<String>
-        get() = _genreErrorMessage
-
-    private var _directorError = MutableLiveData<Boolean>(true)
-    var directorError: LiveData<Boolean>
-        get() = _directorError
-        set(value) { _directorError.value = value.value }
-
-    private val _directorErrorMessage = MutableLiveData<String>()
-    val directorErrorMessage: LiveData<String>
-        get() = _directorErrorMessage
-
-    private var _actorsError = MutableLiveData<Boolean>(true)
-    var actorsError: LiveData<Boolean>
-        get() = _actorsError
-        set(value) { _actorsError.value = value.value }
-
-    private val _actorsErrorMessage = MutableLiveData<String>()
-    val actorsErrorMessage: LiveData<String>
-        get() = _actorsErrorMessage
-
-    private var _ratingError = MutableLiveData<Boolean>(true)
-    var ratingError: LiveData<Boolean>
-        get() = _ratingError
-        set(value) { _ratingError.value = value.value }
-
-    private val _ratingErrorMessage = MutableLiveData<String>()
-    val ratingErrorMessage: LiveData<String>
-        get() = _ratingErrorMessage
-
-    private var _isAddButtonEnabled = MutableLiveData<Boolean>(false)
-    var isAddButtonEnabled: LiveData<Boolean>
-        get() = _isAddButtonEnabled
-        set(value) { _isAddButtonEnabled.value = value.value }
-
-    fun validateTitle(title: String) {
-        if (title.isEmpty()) {
-            _titleErrorMessage.value = "Title cannot be empty"
-            titleError = MutableLiveData(true)
-        } else {
-            titleError = MutableLiveData(false)
+    var year: MutableState<String> = mutableStateOf(movie.year)
+    var isYearValid: MutableState<Boolean> = mutableStateOf(false)
+    var yearErrMsg: MutableState<String> = mutableStateOf("")
+    private val genres = Genre.values().toList()
+    var selectedGenres: MutableState<List<ListItemSelectable>> = mutableStateOf(
+        genres.map { genre ->
+            ListItemSelectable(
+                title = genre.toString(),
+                isSelected = false
+            )
         }
-        updateAddButtonState()
-    }
+    )
+    var isGenresValid: MutableState<Boolean> = mutableStateOf(false)
+    var genresErrMsg: MutableState<String> = mutableStateOf("")
 
-    fun validateYear(year: String) {
-        if (year.isEmpty()) {
-            _yearErrorMessage.value = "Year cannot be empty"
-            yearError = MutableLiveData(true)
-        } else {
-            yearError = MutableLiveData(false)
+    var director: MutableState<String> = mutableStateOf(movie.director)
+    var isDirectorValid: MutableState<Boolean> = mutableStateOf(false)
+    var directorErrMsg: MutableState<String> = mutableStateOf("")
+
+    var actors: MutableState<String> = mutableStateOf(movie.actors)
+    var isActorsValid: MutableState<Boolean> = mutableStateOf(false)
+    var actorsErrMsg: MutableState<String> = mutableStateOf("")
+
+    var plot: MutableState<String> = mutableStateOf(movie.plot)
+    var isPlotValid: MutableState<Boolean> = mutableStateOf(false)
+    var plotErrMsg: MutableState<String> = mutableStateOf("")
+
+    var rating: MutableState<String> = mutableStateOf(movie.rating.toString())
+    var isRatingValid: MutableState<Boolean> = mutableStateOf(false)
+    var ratingErrMsg: MutableState<String> = mutableStateOf("")
+
+    var isEnabledAddMovieButton: MutableState<Boolean> = mutableStateOf(false)
+
+    init {
+        viewModelScope.launch {
+            repository.getAllMovies().collect{ movieList ->
+                _movieList.value = movieList
+            }
         }
-        updateAddButtonState()
     }
 
-    fun validateGenres(genres: List<ListItemSelectable>) {
-        if (genres.isEmpty()) {
-            _genreErrorMessage.value = "At least one genre must be selected"
-            genreError = MutableLiveData(true)
+    private fun shouldEnabledAddMovieButton() {
+        isEnabledAddMovieButton.value = title.value.isNotEmpty() && year.value.isNotEmpty()
+                && selectedGenres.value.count { it.isSelected } != 0 && director.value.isNotEmpty() &&
+                actors.value.isNotEmpty() && plot.value.isNotEmpty() && !(rating.value.isEmpty() || rating.value.toFloatOrNull() == null) &&
+                titleErrMsg.value.isEmpty() && yearErrMsg.value.isEmpty() && genresErrMsg.value.isEmpty() && directorErrMsg.value.isEmpty()
+                && actorsErrMsg.value.isEmpty() && plotErrMsg.value.isEmpty() && ratingErrMsg.value.isEmpty()
+    }
+
+    fun validateTitle() {
+        if (title.value.isEmpty()) {
+            isTitleValid.value = true
+            titleErrMsg.value = "Title cannot be empty"
         } else {
-            genreError = MutableLiveData(false)
+            isTitleValid.value = false
+            titleErrMsg.value = ""
         }
-        updateAddButtonState()
+        shouldEnabledAddMovieButton()
     }
 
-    fun validateDirector(director: String) {
-        if (director.isEmpty()) {
-            _directorErrorMessage.value = "Director cannot be empty"
-            directorError = MutableLiveData(true)
+    fun validateYear() {
+        if (year.value.isEmpty()) {
+            isYearValid.value = true
+            yearErrMsg.value = "Year cannot be empty"
         } else {
-            directorError = MutableLiveData(false)
+            isYearValid.value = false
+            yearErrMsg.value = ""
         }
-        updateAddButtonState()
+        shouldEnabledAddMovieButton()
     }
 
-    fun validateActors(actors: String) {
-        if (actors.isEmpty()) {
-            _actorsErrorMessage.value = "Actors cannot be empty"
-            actorsError = MutableLiveData(true)
+    fun validateGenres() {
+        val selectedGenresCount = selectedGenres.value.count { it.isSelected }
+        if (selectedGenresCount == 0) {
+            isGenresValid.value = true
+            genresErrMsg.value = "At least one genre must be selected"
         } else {
-            actorsError = MutableLiveData(false)
+            isGenresValid.value = false
+            genresErrMsg.value = ""
         }
-        updateAddButtonState()
+        shouldEnabledAddMovieButton()
     }
 
-    fun validateRating(rating: Float) {
-        if (rating <= 0) {
-            _ratingErrorMessage.value = "Rating must be greater than 0"
-            ratingError = MutableLiveData(true)
+    fun validateDirector() {
+        if (director.value.isEmpty()) {
+            isDirectorValid.value = true
+            directorErrMsg.value = "Director cannot be empty"
         } else {
-            ratingError = MutableLiveData(false)
+            isDirectorValid.value = false
+            directorErrMsg.value = ""
         }
-        updateAddButtonState()
+        shouldEnabledAddMovieButton()
     }
 
-    private fun updateAddButtonState() {
-        // TODO: add genre check
-        _isAddButtonEnabled.value = !(titleError.value == true || yearError.value == true || directorError.value == true || actorsError.value == true || ratingError.value == true)
+    fun validateActors() {
+        if (actors.value.isEmpty()) {
+            isActorsValid.value = true
+            actorsErrMsg.value = "Please enter at least one actor"
+        } else {
+            isActorsValid.value = false
+            actorsErrMsg.value = ""
+        }
+        shouldEnabledAddMovieButton()
     }
 
-    fun markFavorite(movie: Movie) {
+    fun validatePlot() {
+        if (plot.value.isEmpty()) {
+            isPlotValid.value = true
+            plotErrMsg.value = "Please enter the plot"
+        } else {
+            isPlotValid.value = false
+            plotErrMsg.value = ""
+        }
+        shouldEnabledAddMovieButton()
+    }
+
+    fun validateRating() {
+        if (rating.value.isEmpty() || rating.value.toFloatOrNull() == null) {
+            isRatingValid.value = true
+            ratingErrMsg.value = "Please enter a valid rating.(Decimal)"
+        } else {
+            isRatingValid.value = false
+            ratingErrMsg.value = ""
+        }
+        shouldEnabledAddMovieButton()
+    }
+
+    suspend fun toggleFavorite(movie: Movie) {
         movie.isFavorite = !movie.isFavorite
-        if(movie.isFavorite)
-            _favorites.add(movie)
-        else if (_favorites.contains(movie))
-            _favorites.remove(movie)
+        repository.update(movie);
     }
 
-    fun addMovie(movie: Movie){
-        _movieList.add(movie)
+    fun getFavoriteMovies(): List<Movie> {
+        var list = emptyList<Movie>()
+        viewModelScope.launch {
+            repository.getAllFavorite().collect{ movieList ->
+                list = movieList
+            }
+        }
+        return list;
+    }
+
+    fun getSelectedMovie(movieId: String): Movie? {
+        movie
+        viewModelScope.launch {
+            movie = repository.getMovieById(movie.id)
+        }
+        return movie;
+    }
+
+    fun addMovie(navController: NavController) {
+        var moviee: Movie = Movie()
+        //moviee.id = _movieList.size + 1
+        moviee.title = title.value;
+        moviee.year = year.value
+        val selectedGenreList = selectedGenres.value
+            .filter { it.isSelected }
+            .map { Genre.valueOf(it.title.uppercase(Locale.ROOT)) }
+        moviee.genre = selectedGenreList
+        moviee.director = director.value
+        moviee.actors = actors.value
+        moviee.plot = plot.value
+        moviee.rating = rating.value.toFloat()
+        viewModelScope.launch {
+            repository.add(moviee);
+        }
+        resetForm()
+        navController.popBackStack()
+    }
+
+    private fun resetForm() {
+        title.value = ""
+        isTitleValid.value = false
+        titleErrMsg.value = ""
+
+        year.value = ""
+        isYearValid.value = false
+        yearErrMsg.value = ""
+
+        selectedGenres.value = selectedGenres.value.map { it.copy(isSelected = false) }
+        isGenresValid.value = false
+        genresErrMsg.value = ""
+
+        director.value = ""
+        isDirectorValid.value = false
+        directorErrMsg.value = ""
+
+        actors.value = ""
+        isActorsValid.value = false
+        actorsErrMsg.value = ""
+
+        plot.value = ""
+        isPlotValid.value = false
+        plotErrMsg.value = ""
+
+        rating.value = ""
+        isRatingValid.value = false
+        ratingErrMsg.value = ""
+
+        isEnabledAddMovieButton.value = false
     }
 }

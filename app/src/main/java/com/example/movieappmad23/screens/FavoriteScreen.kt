@@ -1,41 +1,49 @@
 package com.example.movieappmad23.screens
 
+import android.util.Log
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavController
-import com.example.movieappmad23.models.Movie
-import com.example.movieappmad23.models.getMovies
-import com.example.movieappmad23.viewmodels.ViewMovieModel
-import com.example.movieappmad23.widgets.MovieRow
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
+import com.example.movieappmad23.modelviews.ViewMovieModel
 import com.example.movieappmad23.widgets.SimpleTopAppBar
 
 @Composable
-fun FavoriteScreen(navController: NavController, viewMovieModel: ViewMovieModel){
-    Scaffold(topBar = {
-        SimpleTopAppBar(arrowBackClicked = { navController.popBackStack() }) {
-            Text(text = "My Favorite Movies")
-        }
-    }){ padding ->
-        //val movieList: List<Movie> = getMovies()
+fun FavoriteScreen(
+    navController: NavHostController,
+    movieViewModel: ViewMovieModel
+) {
+    Scaffold(
+        topBar = {
+            SimpleTopAppBar(arrowBackClicked = { navController.popBackStack() }) {
+                Text(text = "My Favorite Movies")
+            }
+        },
+        content = { padding ->
+            Log.d("Padding Values", "$padding")
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colors.background)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    val favoriteMovies = movieViewModel.getFavoriteMovies()
 
-        Column(modifier = Modifier.padding(padding)) {
-            LazyColumn {
-                items(viewMovieModel.favorites){ movie ->
-                    MovieRow(
-                        movie = movie,
-                        onItemClick = { movieId ->
-                            navController.navigate(route = Screen.DetailScreen.withId(movieId))
-                        },
-                        onFavoriteClick = {viewMovieModel.markFavorite(movie)}
-                    )
+                    MovieList(navController = navController, movies = favoriteMovies, movieModel = movieViewModel)
                 }
             }
         }
-    }
+    )
 }
